@@ -251,6 +251,8 @@ button { font-family:inherit; }
 
 /* ── TV INTERVAL BUTTONS ── */
 .tv-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px }
+.tv-bar-left  { display:flex; align-items:center; gap:6px }
+.tv-bar-right { display:flex; align-items:center; gap:4px }
 .iv-wrap { display:flex; gap:3px }
 .iv-btn {
   font-family:var(--disp); font-size:9px; font-weight:700; letter-spacing:.1em;
@@ -259,8 +261,45 @@ button { font-family:inherit; }
 }
 .iv-btn:hover { color:var(--tx) }
 .iv-btn.active { background:var(--ac); color:#fff; border-color:var(--ac) }
-.tv-frame-wrap { border-radius:var(--r); overflow:hidden; border:1px solid var(--bd) }
-#tvFrame       { width:100%; height:360px; display:block; border:none; background:var(--bg-c) }
+.tv-acct-note {
+  font-family:var(--disp); font-size:9px; color:var(--tx-m); letter-spacing:.04em;
+  display:flex; align-items:center; gap:4px;
+}
+.tv-acct-dot { width:6px; height:6px; border-radius:50%; background:var(--gr); flex-shrink:0 }
+.fs-btn {
+  font-family:var(--disp); font-size:9px; font-weight:700; letter-spacing:.1em;
+  padding:2px 9px; border-radius:var(--r); border:1px solid var(--bd-h);
+  background:var(--bg-c); cursor:pointer; color:var(--tx-d); transition:all .12s;
+  display:flex; align-items:center; gap:5px;
+}
+.fs-btn:hover { color:var(--ac); border-color:var(--ac) }
+/* frame wrapper — resizable */
+.tv-frame-wrap {
+  border-radius:var(--r); overflow:hidden; border:1px solid var(--bd);
+  position:relative; margin-bottom:14px;
+}
+#tvFrame { width:100%; height:500px; display:block; border:none; background:var(--bg-c) }
+/* Fullscreen overlay */
+.tv-fullscreen {
+  position:fixed; inset:0; z-index:10000;
+  background:var(--bg); display:flex; flex-direction:column;
+  animation:fsIn .18s ease;
+}
+@keyframes fsIn { from{opacity:0;transform:scale(.98)} to{opacity:1;transform:scale(1)} }
+.tv-fs-bar {
+  flex-shrink:0; height:40px; background:var(--bg-p); border-bottom:1px solid var(--bd);
+  display:flex; align-items:center; padding:0 14px; gap:10px;
+}
+.tv-fs-sym { font-family:var(--disp); font-size:15px; font-weight:800; color:var(--tx); letter-spacing:.06em }
+.tv-fs-ivs { display:flex; gap:3px }
+.tv-fs-close {
+  margin-left:auto; font-family:var(--disp); font-size:10px; font-weight:700;
+  letter-spacing:.1em; padding:3px 12px; border-radius:var(--r);
+  border:1px solid var(--rd-b); background:var(--rd-d); color:var(--rd);
+  cursor:pointer; transition:all .12s;
+}
+.tv-fs-close:hover { background:var(--rd); color:#fff }
+#tvFrameFull { width:100%; flex:1; border:none; display:block; background:var(--bg-c) }
 
 /* ── METRICS ── */
 .mt-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:14px }
@@ -592,8 +631,27 @@ function tvDeepLink(sym, sec) {
   return 'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(tvSym(sym,sec));
 }
 function tvEmbedUrl(sym, sec, iv, theme) {
-  const t = (theme||S.theme)==='dark' ? 'dark' : 'light';
-  return `https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(tvSym(sym,sec))}&interval=${iv}&theme=${t}&style=1&locale=en&hide_top_toolbar=0&hide_legend=0&allow_symbol_change=false&save_image=false&hide_volume=0`;
+  const t   = (theme||S.theme)==='dark' ? 'dark' : 'light';
+  const tvsym = tvSym(sym, sec);
+  // Using widgetembed with session — if user is logged into TradingView in this browser,
+  // the iframe inherits their session: saved templates, indicators & layouts load automatically.
+  // Drawings/saves inside the iframe persist to their account via the TV session cookie.
+  const params = new URLSearchParams({
+    symbol:             tvsym,
+    interval:           iv,
+    theme:              t,
+    style:              '1',
+    locale:             'en',
+    hide_top_toolbar:   '0',
+    hide_legend:        '0',
+    allow_symbol_change:'0',
+    save_image:         '1',     // allows saving chart image
+    hide_volume:        '0',
+    studies:            '',      // user's default template applies automatically
+    withdateranges:     '1',
+    range:              'YTD',
+  });
+  return `https://www.tradingview.com/widgetembed/?${params.toString()}`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1187,11 +1245,21 @@ async function renderPreview(sym) {
       <!-- TRADINGVIEW CHART -->
       <div class="sec-lbl">LIVE CHART · TRADINGVIEW</div>
       <div class="tv-bar">
-        <div class="iv-wrap" id="ivWrap">${ivBtns}</div>
+        <div class="tv-bar-left">
+          <div class="iv-wrap" id="ivWrap">${ivBtns}</div>
+          <div class="tv-acct-note"><div class="tv-acct-dot"></div>Session-linked · Stay logged into TradingView to load your templates &amp; save drawings</div>
+        </div>
+        <div class="tv-bar-right">
+          <button class="fs-btn" onclick="openFullscreen('${sym}','${sec}')">
+            ⛶ FULLSCREEN
+          </button>
+        </div>
       </div>
       <div class="tv-frame-wrap">
-        <iframe id="tvFrame" src="${tvEmbedUrl(sym, sec, S.tvIv, S.theme)}" 
-                allowtransparency="true" frameborder="0" scrolling="no" allowfullscreen></iframe>
+        <iframe id="tvFrame"
+          src="${tvEmbedUrl(sym, sec, S.tvIv, S.theme)}"
+          allowtransparency="true" frameborder="0" scrolling="no"
+          allowfullscreen allow="fullscreen"></iframe>
       </div>
 
       <div class="divider"></div>
@@ -1275,10 +1343,57 @@ function setTfCell(period, val) {
 
 function setTvIv(iv) {
   S.tvIv = iv; sv('fd2_tvIv', iv);
-  document.querySelectorAll('.iv-btn').forEach(b => b.classList.toggle('active', b.textContent===TV_LBLS[iv]));
+  document.querySelectorAll('#ivWrap .iv-btn').forEach(b => b.classList.toggle('active', b.textContent===TV_LBLS[iv]));
   const frame = document.getElementById('tvFrame');
   const sym   = S.selected[S.sector];
   if (frame && sym) frame.src = tvEmbedUrl(sym, S.sector, iv, S.theme);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FULLSCREEN CHART
+// ═══════════════════════════════════════════════════════════
+function openFullscreen(sym, sec) {
+  const dsym = dispSym(sym, sec);
+  const ivBtns = TV_IVS.map(iv =>
+    `<button class="iv-btn ${iv===S.tvIv?'active':''}" onclick="fsSetIv('${iv}','${sym}','${sec}')">${TV_LBLS[iv]}</button>`
+  ).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'tv-fullscreen';
+  overlay.id = 'tvFsOverlay';
+  overlay.innerHTML = `
+    <div class="tv-fs-bar">
+      <span class="tv-fs-sym">${dsym}</span>
+      <div class="tv-fs-ivs" id="fsIvWrap">${ivBtns}</div>
+      <a href="${tvDeepLink(sym,sec)}" target="_blank" rel="noopener"
+         style="font-family:var(--disp);font-size:10px;font-weight:700;color:var(--ac);text-decoration:none;letter-spacing:.08em;padding:3px 10px;border:1px solid var(--ac-b);border-radius:var(--r);background:var(--ac-d)">
+        ↗ OPEN IN TRADINGVIEW
+      </a>
+      <button class="tv-fs-close" onclick="closeFullscreen()">✕ CLOSE FULLSCREEN</button>
+    </div>
+    <iframe id="tvFrameFull"
+      src="${tvEmbedUrl(sym, sec, S.tvIv, S.theme)}"
+      allowtransparency="true" frameborder="0"
+      allowfullscreen allow="fullscreen"></iframe>`;
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', onFsKey);
+}
+
+function closeFullscreen() {
+  const el = document.getElementById('tvFsOverlay');
+  if (el) el.remove();
+  document.removeEventListener('keydown', onFsKey);
+}
+
+function onFsKey(e) { if (e.key === 'Escape') closeFullscreen(); }
+
+function fsSetIv(iv, sym, sec) {
+  S.tvIv = iv; sv('fd2_tvIv', iv);
+  const frame = document.getElementById('tvFrameFull');
+  if (frame) frame.src = tvEmbedUrl(sym, sec, iv, S.theme);
+  // Update buttons in both panels
+  document.querySelectorAll('#fsIvWrap .iv-btn').forEach(b => b.classList.toggle('active', b.textContent===TV_LBLS[iv]));
+  document.querySelectorAll('#ivWrap .iv-btn').forEach(b => b.classList.toggle('active', b.textContent===TV_LBLS[iv]));
 }
 
 // ═══════════════════════════════════════════════════════════
